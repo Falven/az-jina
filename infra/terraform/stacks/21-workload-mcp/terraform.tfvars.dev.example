@@ -1,0 +1,69 @@
+# Example tfvars for 21-workload-mcp (dev)
+
+subscription_id = "<subscription-id>"
+tenant_id       = "<tenant-id>"
+
+environment_code = "dev"
+location         = "eastus"
+workload_name    = "<workload-name>"
+identifier       = ""
+rg_name_override = "<workload-rg-name>"
+
+existing_aca_environment_id = "/subscriptions/<subscription-id>/resourceGroups/<workload-rg-name>/providers/Microsoft.App/managedEnvironments/<aca-env-name>"
+
+log_retention_days         = 30
+log_analytics_workspace_id = ""
+
+container_image       = "<login-server>/az-jina-mcp:<tag>"
+container_name        = "az-jina-mcp"
+registry_id           = "<acr-resource-id>"
+registry_login_server = "<login-server>"
+registry_username     = ""
+registry_password     = ""
+
+target_port           = 8080
+command               = null
+args                  = null
+cpu                   = 1
+memory                = "2Gi"
+min_replicas          = 1
+max_replicas          = 1
+ingress_external      = true
+ingress_allowed_cidrs = []
+
+app_settings = {
+  NODE_ENV = "production"
+}
+
+secrets                      = {}
+secret_environment_overrides = {}
+inject_identity_client_id    = true
+
+key_vault_name                       = "<key-vault-name>"
+key_vault_resource_group             = "<key-vault-rg>"
+create_key_vault                     = false
+key_vault_sku                        = "standard"
+key_vault_soft_delete_retention_days = 7
+key_vault_purge_protection_enabled   = true
+key_vault_ip_rules                   = []
+
+dns_zone_name           = ""
+dns_zone_resource_group = ""
+dns_record_name         = "<record-name>"
+
+custom_domain = {
+  hostname         = "jina-mcp.example.com"
+  certificate_name = "cert-jina-mcp"
+}
+managed_certificate_enabled = false
+
+state_resource_group_name  = "<state-rg-name>"
+state_storage_account_name = ""
+state_container_name       = "tfstate"
+state_blob_key             = "dev/mcp/terraform.tfstate"
+
+tags = {
+  owner       = "<owner>"
+  environment = "dev"
+  workload    = "<workload-name>"
+}

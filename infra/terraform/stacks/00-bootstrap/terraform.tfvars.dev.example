@@ -1,0 +1,19 @@
+# Example tfvars for 00-bootstrap (dev)
+
+subscription_id = "<subscription-id>"
+tenant_id       = "<tenant-id>"
+
+environment_code = "dev"
+location         = "eastus"
+workload_name    = "<workload-name>"
+identifier       = ""
+
+sa_replication_type        = "LRS"
+soft_delete_retention_days = 30
+state_rg_name_override     = "<state-rg-name>"
+
+tags = {
+  owner       = "<owner>"
+  environment = "dev"
+  workload    = "<workload-name>"
+}

@@ -1,0 +1,6 @@
+[submodule "az-jina-mcp"]
+	path = az-jina-mcp
+	url = https://github.com/jina-ai/MCP.git
+[submodule "az-reader"]
+	path = az-reader
+	url = https://github.com/jina-ai/reader.git
