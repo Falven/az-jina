@@ -1,7 +1,15 @@
+# Terraform state and local artifacts
 **/.terraform/
 **/.terraform.tfstate.lock.info
 **/terraform.tfstate
 **/terraform.tfstate.*
 **/.state/
+
+# Terraform variable files (often contain secrets)
+infra/terraform/stacks/**/*.tfvars
+infra/terraform/stacks/**/*.tfvars.json
+!infra/terraform/stacks/**/terraform.tfvars.*.example
+
+# Python artifacts
 **/__pycache__/
 **/*.pyc
