@@ -23,3 +23,5 @@
 - 2026-01-21T19:06:40Z Removed edge and reader-runtime folders (and 22-workload-edge stack dir) to satisfy no-edge/no-runtime guardrails.
 
 - 2026-01-21T20:21:50Z az-reader thinapps-shared now lazy-loads Azure SDKs so COSMOS/BLOB can remain optional without adding dependencies or changing the Dockerfile.
+
+- 2026-01-21T20:36:49Z Fixed SnapshotFormatter threadLocal injection by using AsyncLocalContext class; updated build/shared snapshot-formatter output to match (build/ is gitignored).
