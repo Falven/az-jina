@@ -19,3 +19,5 @@
 - 2026-01-21T18:56:05Z F04: added JINA_EMBEDDINGS_DASHBOARD_BASE_URL env override in az-reader thinapps-shared secrets and auth DTO to point at custom auth service.
 
 - 2026-01-21T19:04:30Z F05: added 23-workload-auth stack and deploy hook; deploy_workload now skips edge and updates reader auth_dashboard_base_url after auth deploy; deploy_workload_reader uses az-reader/Dockerfile.
+
+- 2026-01-21T19:06:40Z Removed edge and reader-runtime folders (and 22-workload-edge stack dir) to satisfy no-edge/no-runtime guardrails.
