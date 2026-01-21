@@ -9,3 +9,9 @@
 - 2026-01-21T18:10:20Z F02: shim buffer.SlowBuffer in tests to avoid Node 25 SlowBuffer removal during civkit/jsonwebtoken load.
 
 - 2026-01-21T18:11:20Z F02: replaced private thinapps-shared submodule with local JS build output + minimal .d.ts shims; added tests for auth/env/errors; removed az-reader/.gitmodules and gitlink.
+
+- 2026-01-21T18:36:10Z F03: added FastAPI auth service in services/auth using Key Vault + managed identity; added Dockerfile and contract test script.
+- 2026-01-21T18:36:10Z F03: root uv workspace (pyproject.toml + uv.lock) so  works; ops.keys list no longer emits secrets.
+
+- 2026-01-21T18:36:10Z F03: added FastAPI auth service in services/auth using Key Vault + managed identity; added Dockerfile and contract test script.
+- 2026-01-21T18:36:10Z F03: root uv workspace (pyproject.toml + uv.lock) so uv run python -m ops.keys works; ops.keys list no longer emits secrets.
