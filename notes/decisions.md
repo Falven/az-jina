@@ -21,3 +21,5 @@
 - 2026-01-21T19:04:30Z F05: added 23-workload-auth stack and deploy hook; deploy_workload now skips edge and updates reader auth_dashboard_base_url after auth deploy; deploy_workload_reader uses az-reader/Dockerfile.
 
 - 2026-01-21T19:06:40Z Removed edge and reader-runtime folders (and 22-workload-edge stack dir) to satisfy no-edge/no-runtime guardrails.
+
+- 2026-01-21T20:21:50Z az-reader thinapps-shared now lazy-loads Azure SDKs so COSMOS/BLOB can remain optional without adding dependencies or changing the Dockerfile.
