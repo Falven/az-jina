@@ -1,0 +1,67 @@
+# Example tfvars for 23-workload-auth (dev)
+
+subscription_id = "<subscription-id>"
+tenant_id       = "<tenant-id>"
+
+environment_code = "dev"
+location         = "eastus"
+workload_name    = "azjina"
+identifier       = ""
+
+container_image       = "acrapisixprodeusplatformecynr3.azurecr.io/az-jina-auth:latest"
+container_name        = "az-jina-auth"
+registry_id           = "/subscriptions/a68fcd37-74e0-4dae-94eb-7c1f33a36b4c/resourceGroups/rg-apisix-prod-eus-platform/providers/Microsoft.ContainerRegistry/registries/acrapisixprodeusplatformecynr3"
+registry_login_server = "acrapisixprodeusplatformecynr3.azurecr.io"
+registry_username     = ""
+registry_password     = ""
+
+target_port           = 8080
+command               = null
+args                  = null
+cpu                   = 0.5
+memory                = "1Gi"
+min_replicas          = 1
+max_replicas          = 2
+ingress_external      = false
+ingress_allowed_cidrs = []
+
+app_settings = {
+  NODE_ENV               = "production"
+  API_KEY_PREFIX         = "azjina"
+  API_KEY_CACHE_TTL_SECONDS = "300"
+  DEFAULT_WALLET_BALANCE = "1000000"
+}
+
+secrets = {
+  auth-dashboard-api-key = "<value>"
+}
+
+secret_environment_overrides = {
+  AUTH_DASHBOARD_API_KEY = "auth-dashboard-api-key"
+}
+
+inject_identity_client_id = true
+
+# Optional overrides (defaults to reader stack outputs)
+key_vault_name           = ""
+key_vault_resource_group = ""
+key_vault_ip_rules       = []
+
+dns_zone_name           = ""
+dns_zone_resource_group = ""
+dns_record_name         = ""
+
+custom_domain               = null
+managed_certificate_enabled = false
+
+state_resource_group_name  = "<state-rg-name>"
+state_storage_account_name = ""
+state_container_name       = "tfstate"
+state_blob_key             = "dev/auth/terraform.tfstate"
+reader_state_blob_key      = "dev/reader/terraform.tfstate"
+
+tags = {
+  owner       = "fraguile"
+  environment = "dev"
+  workload    = "azjina"
+}

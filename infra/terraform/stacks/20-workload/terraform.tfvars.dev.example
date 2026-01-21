@@ -6,23 +6,24 @@ tenant_id       = "11111111-1111-1111-1111-111111111111"
 environment_code = "dev"
 location         = "eastus"
 cosmos_location  = "" # optional override; defaults to location
-workload_name    = "<workload-name>"
+enable_cosmos    = false
+workload_name    = "azjina"
 identifier       = ""
 
 # Optional shared workload RG/ACA env overrides
-rg_name_override      = "<workload-rg-name>"
-aca_env_name_override = "<aca-env-name>"
+rg_name_override      = "rg-azjina-dev-eus-workload"
+aca_env_name_override = "aca-azjina-dev-eus"
 
 # Container image + registry (defaults for local dev)
-container_image       = "<acr>.azurecr.io/az-reader:latest"
-registry_id           = "" # optional; set to ACR resource ID to grant AcrPull
-registry_login_server = "<acr>.azurecr.io"
+container_image       = "acrapisixprodeusplatformecynr3.azurecr.io/az-reader:latest"
+registry_id           = "/subscriptions/a68fcd37-74e0-4dae-94eb-7c1f33a36b4c/resourceGroups/rg-apisix-prod-eus-platform/providers/Microsoft.ContainerRegistry/registries/acrapisixprodeusplatformecynr3"
+registry_login_server = "acrapisixprodeusplatformecynr3.azurecr.io"
 registry_username     = "" # optional if using managed identity
 registry_password     = "" # optional if using managed identity
 
 # Key Vault
-key_vault_name                       = "<key-vault-name>"
-key_vault_resource_group             = "<key-vault-rg>"
+key_vault_name                       = "kv-apisix-prod-eus-kv-ww"
+key_vault_resource_group             = "rg-apisix-prod-eus-platform"
 create_key_vault                     = false
 key_vault_sku                        = "standard"
 key_vault_soft_delete_retention_days = 7
@@ -47,7 +48,6 @@ log_analytics_workspace_id = ""
 app_settings = {
   # Helpful dev defaults; copy to terraform.tfvars.dev and adjust.
   NODE_ENV                          = "production"
-  NODE_OPTIONS                      = "--require=/app/build/shared/register-searcher.js"
   AZURE_OPENAI_ENDPOINT             = "https://your-openai-endpoint.openai.azure.com/"
   AZURE_OPENAI_DEPLOYMENT           = "gpt-5-mini"
   AZURE_OPENAI_API_VERSION          = "2024-12-01-preview"
@@ -56,11 +56,15 @@ app_settings = {
   COSMOS_AUTH_MODE                  = "aad"
   PORT                              = "8080"
   SELF_HOST_TOKENS_SECRET_NAME      = "self-host-tokens"
-  SELF_HOST_TOKENS_VAULT_URL        = "https://<key-vault-name>.vault.azure.net"
+  SELF_HOST_TOKENS_VAULT_URL        = "https://kv-apisix-prod-eus-kv-ww.vault.azure.net"
 }
 
-# Secrets (Key Vault seed values) — populated by deploy-workload; keep out of VCS
+# Auth service base URL (optional). Leave empty to use Jina's default dashboard.
+auth_dashboard_base_url = ""
+
+# Secrets (Key Vault seed values). Leave empty if secrets already exist in Key Vault.
 secrets = {
+  auth-dashboard-api-key = "<value>"
   azure-openai-api-key  = "<value>"
   brave-search-api-key  = "<value>"
   jina-serp-api-key     = "<value>"
@@ -69,6 +73,7 @@ secrets = {
 
 # Map env var -> secret name override (optional)
 secret_environment_overrides = {
+  JINA_EMBEDDINGS_DASHBOARD_API_KEY = "auth-dashboard-api-key"
   AZURE_OPENAI_API_KEY  = "azure-openai-api-key"
   BRAVE_SEARCH_API_KEY  = "brave-search-api-key"
   JINA_SERP_API_KEY     = "jina-serp-api-key"
@@ -82,7 +87,7 @@ state_container_name       = "tfstate"
 state_blob_key             = "dev/reader/terraform.tfstate"
 
 tags = {
-  owner       = "<owner>"
+  owner       = "fraguile"
   environment = "dev"
-  workload    = "<workload-name>"
+  workload    = "azjina"
 }

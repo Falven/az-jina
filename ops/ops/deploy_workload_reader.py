@@ -44,9 +44,9 @@ def deploy_workload(
         build_context=Path("az-reader"),
         include_paths=[
             Path("acr-build.yaml"),
-            Path("az-reader/Dockerfile"),
             Path("az-reader/package.json"),
             Path("az-reader/package-lock.json"),
+            Path("az-reader/Dockerfile"),
             Path("az-reader/build"),
             Path("az-reader/public"),
             Path("az-reader/licensed"),

@@ -44,6 +44,7 @@ module "env" {
 }
 
 module "cosmos" {
+  count  = var.enable_cosmos ? 1 : 0
   source = "../../modules/data/cosmos"
 
   resource_group_name       = module.env.rg_name
@@ -60,16 +61,18 @@ module "cosmos" {
 }
 
 locals {
-  cosmos_app_settings = {
+  cosmos_app_settings = var.enable_cosmos ? {
     COSMOS_ENABLED       = "true"
-    COSMOS_ENDPOINT      = module.cosmos.endpoint
-    COSMOS_DB            = module.cosmos.database_name
-    RATE_LIMIT_CONTAINER = module.cosmos.rate_limit_container_name
+    COSMOS_ENDPOINT      = module.cosmos[0].endpoint
+    COSMOS_DB            = module.cosmos[0].database_name
+    RATE_LIMIT_CONTAINER = module.cosmos[0].rate_limit_container_name
+    } : {
+    COSMOS_ENABLED = "false"
   }
 
-  cosmos_secrets = {
-    "cosmos-key" = module.cosmos.primary_key
-  }
+  cosmos_secrets = var.enable_cosmos ? {
+    "cosmos-key" = module.cosmos[0].primary_key
+  } : {}
 
   key_vault_rg        = var.key_vault_resource_group != "" ? var.key_vault_resource_group : module.env.rg_name
   _kv_name_validation = var.create_key_vault && var.key_vault_name == "" ? error("key_vault_name is required when create_key_vault is true") : true
@@ -79,22 +82,26 @@ locals {
     SELF_HOST_TOKENS_VAULT_URL   = local.key_vault_uri_final
   }
 
+  auth_app_settings = var.auth_dashboard_base_url != "" ? {
+    JINA_EMBEDDINGS_DASHBOARD_BASE_URL = var.auth_dashboard_base_url
+  } : {}
+
   base_app_settings = merge(
     {
       for key, value in var.app_settings : key => value if !contains(["PORT", "NODE_OPTIONS"], key)
     },
     local.cosmos_app_settings,
-    local.self_host_app_settings
+    local.self_host_app_settings,
+    local.auth_app_settings
   )
 
-  base_secrets = merge(var.secrets, local.cosmos_secrets)
   base_secret_overrides = merge(
     var.secret_environment_overrides,
-    { COSMOS_KEY = "cosmos-key" }
+    var.enable_cosmos ? { COSMOS_KEY = "cosmos-key" } : {}
   )
 
   search_target_port  = 8082
-  shared_node_require = "--require=/app/build/shared/enforce-auth.js"
+  shared_node_require = ""
 
   crawl_app_settings = merge(
     local.base_app_settings,
@@ -104,10 +111,7 @@ locals {
     }
   )
 
-  search_node_options = trimspace(join(" ", compact([
-    local.shared_node_require,
-    lookup(var.app_settings, "NODE_OPTIONS", ""),
-  ])))
+  search_node_options = trimspace(local.shared_node_require)
 
   search_app_settings = merge(
     local.base_app_settings,
@@ -166,6 +170,39 @@ locals {
   key_vault_parent_id = "/subscriptions/${var.subscription_id}/resourceGroups/${local.key_vault_rg}"
 }
 
+locals {
+  key_vault_seed_values   = merge(var.secrets, local.cosmos_secrets)
+  key_vault_secret_names  = toset(concat(values(var.secret_environment_overrides), var.enable_cosmos ? ["cosmos-key"] : []))
+  _kv_seed_requires_vault = length(local.key_vault_seed_values) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secrets are provided") : true
+  _kv_refs_requires_vault = length(local.key_vault_secret_names) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secret_environment_overrides are configured") : true
+}
+
+resource "azurerm_key_vault_secret" "seeded" {
+  for_each = local.key_vault_id_final != null ? local.key_vault_seed_values : {}
+
+  name         = each.key
+  value        = each.value
+  key_vault_id = local.key_vault_id_final
+}
+
+data "azurerm_key_vault_secret" "existing" {
+  for_each = local.key_vault_id_final != null ? {
+    for name in local.key_vault_secret_names : name => name
+    if !contains(keys(local.key_vault_seed_values), name)
+  } : {}
+
+  name         = each.value
+  key_vault_id = local.key_vault_id_final
+}
+
+locals {
+  key_vault_secret_ids = merge(
+    { for name, secret in azurerm_key_vault_secret.seeded : name => secret.id },
+    { for name, secret in data.azurerm_key_vault_secret.existing : name => secret.id }
+  )
+  _kv_refs_complete = length(local.key_vault_secret_names) > length(local.key_vault_secret_ids) ? error("missing Key Vault secrets for one or more secret_environment_overrides") : true
+}
+
 module "reader_app_crawl" {
   source = "../../modules/aca/reader-app"
 
@@ -189,7 +226,8 @@ module "reader_app_crawl" {
   ingress_external             = var.ingress_external
   ingress_allowed_cidrs        = var.ingress_allowed_cidrs
   app_settings                 = local.crawl_app_settings
-  secrets                      = local.base_secrets
+  secrets                      = {}
+  key_vault_secret_ids         = local.key_vault_secret_ids
   secret_environment_overrides = local.base_secret_overrides
   tags                         = local.crawl_tags
 }
@@ -218,7 +256,8 @@ module "reader_app_search" {
   ingress_external             = var.ingress_external
   ingress_allowed_cidrs        = var.ingress_allowed_cidrs
   app_settings                 = local.search_app_settings
-  secrets                      = local.base_secrets
+  secrets                      = {}
+  key_vault_secret_ids         = local.key_vault_secret_ids
   secret_environment_overrides = local.base_secret_overrides
   tags                         = local.search_tags
 }
@@ -231,14 +270,14 @@ locals {
 }
 
 resource "azurerm_cosmosdb_sql_role_assignment" "reader_app_data_contributor" {
-  for_each = local.app_identities
+  for_each = var.enable_cosmos ? local.app_identities : {}
 
-  name                = uuidv5("6ba7b810-9dad-11d1-80b4-00c04fd430c8", "${module.cosmos.account_id}:${each.value}:data-contributor")
+  name                = uuidv5("6ba7b810-9dad-11d1-80b4-00c04fd430c8", "${module.cosmos[0].account_id}:${each.value}:data-contributor")
   resource_group_name = module.env.rg_name
-  account_name        = module.cosmos.account_name
-  role_definition_id  = "${module.cosmos.account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  account_name        = module.cosmos[0].account_name
+  role_definition_id  = "${module.cosmos[0].account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   principal_id        = each.value
-  scope               = module.cosmos.account_id
+  scope               = module.cosmos[0].account_id
 }
 
 resource "azurerm_key_vault_access_policy" "apps" {
