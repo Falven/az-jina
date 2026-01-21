@@ -2,9 +2,10 @@
 /// Purpose: Deploy az-jina-mcp Container App (optionally reusing existing ACA environment)
 
 locals {
-  workload_code = lower(var.workload_name)
-  env_code      = lower(var.environment_code)
-  identifier    = var.identifier != "" ? lower(var.identifier) : ""
+  workload_code    = lower(var.workload_name)
+  env_code         = lower(var.environment_code)
+  identifier       = var.identifier != "" ? lower(var.identifier) : ""
+  reader_state_key = var.reader_state_blob_key != "" ? var.reader_state_blob_key : "${var.environment_code}/reader/terraform.tfstate"
 
   using_existing_env = var.existing_aca_environment_id != ""
   existing_rg_name = local.using_existing_env ? (
@@ -28,6 +29,18 @@ data "terraform_remote_state" "bootstrap" {
     storage_account_name = var.state_storage_account_name
     container_name       = var.state_container_name
     key                  = var.state_blob_key
+  }
+}
+
+data "terraform_remote_state" "reader" {
+  backend = "azurerm"
+  config = {
+    use_azuread_auth     = true
+    tenant_id            = var.tenant_id
+    resource_group_name  = var.state_resource_group_name
+    storage_account_name = var.state_storage_account_name
+    container_name       = var.state_container_name
+    key                  = local.reader_state_key
   }
 }
 
@@ -60,16 +73,22 @@ data "azurerm_resource_group" "workload" {
 }
 
 locals {
-  rg_name      = local.using_existing_env ? data.azurerm_resource_group.workload[0].name : module.env[0].rg_name
-  aca_env_id   = local.using_existing_env ? var.existing_aca_environment_id : module.env[0].aca_env_id
-  key_vault_rg = var.key_vault_resource_group != "" ? var.key_vault_resource_group : local.rg_name
+  rg_name            = local.using_existing_env ? data.azurerm_resource_group.workload[0].name : module.env[0].rg_name
+  aca_env_id         = local.using_existing_env ? var.existing_aca_environment_id : module.env[0].aca_env_id
+  key_vault_rg       = var.key_vault_resource_group != "" ? var.key_vault_resource_group : local.rg_name
+  reader_crawl_fqdn  = data.terraform_remote_state.reader.outputs.crawl_container_app_fqdn
+  reader_search_fqdn = data.terraform_remote_state.reader.outputs.search_container_app_fqdn
+  reader_crawl_base  = startswith(local.reader_crawl_fqdn, "http") ? local.reader_crawl_fqdn : "https://${local.reader_crawl_fqdn}"
+  reader_search_base = startswith(local.reader_search_fqdn, "http") ? local.reader_search_fqdn : "https://${local.reader_search_fqdn}"
 
   base_app_settings = merge(
-    { for key, value in var.app_settings : key => value if key != "PORT" },
-    { PORT = tostring(var.target_port) }
+    {
+      PORT            = tostring(var.target_port)
+      MCP_READER_BASE = local.reader_crawl_base
+      MCP_SEARCH_BASE = local.reader_search_base
+    },
+    { for key, value in var.app_settings : key => value if key != "PORT" }
   )
-
-  base_secrets = var.secrets
 
   custom_domain     = var.custom_domain
   use_dns_record    = var.dns_zone_name != "" && var.dns_zone_resource_group != "" && var.dns_record_name != ""
@@ -135,6 +154,38 @@ locals {
   key_vault_parent_id = local.key_vault_rg != "" ? "/subscriptions/${var.subscription_id}/resourceGroups/${local.key_vault_rg}" : ""
 }
 
+locals {
+  key_vault_seed_values   = var.secrets
+  key_vault_secret_names  = toset(values(var.secret_environment_overrides))
+  key_vault_seed_names    = toset(nonsensitive(keys(local.key_vault_seed_values)))
+  key_vault_existing_names = setsubtract(local.key_vault_secret_names, local.key_vault_seed_names)
+  _kv_seed_requires_vault = length(local.key_vault_seed_values) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secrets are provided") : true
+  _kv_refs_requires_vault = length(local.key_vault_secret_names) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secret_environment_overrides are configured") : true
+}
+
+resource "azurerm_key_vault_secret" "seeded" {
+  for_each = local.key_vault_id_final != null ? local.key_vault_seed_names : toset([])
+
+  name         = each.key
+  value        = local.key_vault_seed_values[each.key]
+  key_vault_id = local.key_vault_id_final
+}
+
+data "azurerm_key_vault_secret" "existing" {
+  for_each = local.key_vault_id_final != null ? local.key_vault_existing_names : toset([])
+
+  name         = each.key
+  key_vault_id = local.key_vault_id_final
+}
+
+locals {
+  key_vault_secret_ids = merge(
+    { for name, secret in azurerm_key_vault_secret.seeded : name => secret.id },
+    { for name, secret in data.azurerm_key_vault_secret.existing : name => secret.id }
+  )
+  _kv_refs_complete = length(local.key_vault_secret_names) > length(local.key_vault_secret_ids) ? error("missing Key Vault secrets for one or more secret_environment_overrides") : true
+}
+
 module "app" {
   source = "../../modules/aca/app"
 
@@ -168,7 +219,8 @@ module "app" {
     }
   ] : []
   app_settings                 = local.base_app_settings
-  secrets                      = local.base_secrets
+  secrets                      = {}
+  key_vault_secret_ids         = local.key_vault_secret_ids
   secret_environment_overrides = var.secret_environment_overrides
   inject_identity_client_id    = var.inject_identity_client_id
   tags                         = merge(local.common_tags, { component = "mcp" })
@@ -233,10 +285,10 @@ resource "azurerm_dns_cname_record" "app" {
 resource "azapi_resource" "managed_certificate" {
   count = local.managed_certificate_enabled ? 1 : 0
 
-  type       = "Microsoft.App/managedEnvironments/managedCertificates@2024-03-01"
-  name       = local.custom_domain.certificate_name != null && local.custom_domain.certificate_name != "" ? local.custom_domain.certificate_name : replace(local.custom_domain.hostname, ".", "-")
-  parent_id  = local.aca_env_id
-  location   = var.location
+  type      = "Microsoft.App/managedEnvironments/managedCertificates@2024-03-01"
+  name      = local.custom_domain.certificate_name != null && local.custom_domain.certificate_name != "" ? local.custom_domain.certificate_name : replace(local.custom_domain.hostname, ".", "-")
+  parent_id = local.aca_env_id
+  location  = var.location
   body = {
     properties = {
       domainControlValidation = "CNAME"

@@ -25,3 +25,5 @@
 - 2026-01-21T20:21:50Z az-reader thinapps-shared now lazy-loads Azure SDKs so COSMOS/BLOB can remain optional without adding dependencies or changing the Dockerfile.
 
 - 2026-01-21T20:36:49Z Fixed SnapshotFormatter threadLocal injection by using AsyncLocalContext class; updated build/shared snapshot-formatter output to match (build/ is gitignored).
+
+- 2026-01-21T20:45:13Z Terraform: avoid sensitive maps in Key Vault secret for_each by iterating over non-sensitive key sets (stacks 20/21/23).

@@ -173,25 +173,24 @@ locals {
 locals {
   key_vault_seed_values   = merge(var.secrets, local.cosmos_secrets)
   key_vault_secret_names  = toset(concat(values(var.secret_environment_overrides), var.enable_cosmos ? ["cosmos-key"] : []))
+  key_vault_seed_names    = toset(nonsensitive(keys(local.key_vault_seed_values)))
+  key_vault_existing_names = setsubtract(local.key_vault_secret_names, local.key_vault_seed_names)
   _kv_seed_requires_vault = length(local.key_vault_seed_values) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secrets are provided") : true
   _kv_refs_requires_vault = length(local.key_vault_secret_names) > 0 && local.key_vault_id_final == null ? error("key_vault_name must be set when secret_environment_overrides are configured") : true
 }
 
 resource "azurerm_key_vault_secret" "seeded" {
-  for_each = local.key_vault_id_final != null ? local.key_vault_seed_values : {}
+  for_each = local.key_vault_id_final != null ? local.key_vault_seed_names : toset([])
 
   name         = each.key
-  value        = each.value
+  value        = local.key_vault_seed_values[each.key]
   key_vault_id = local.key_vault_id_final
 }
 
 data "azurerm_key_vault_secret" "existing" {
-  for_each = local.key_vault_id_final != null ? {
-    for name in local.key_vault_secret_names : name => name
-    if !contains(keys(local.key_vault_seed_values), name)
-  } : {}
+  for_each = local.key_vault_id_final != null ? local.key_vault_existing_names : toset([])
 
-  name         = each.value
+  name         = each.key
   key_vault_id = local.key_vault_id_final
 }
 

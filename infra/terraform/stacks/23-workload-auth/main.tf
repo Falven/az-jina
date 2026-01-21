@@ -82,25 +82,24 @@ locals {
 locals {
   key_vault_seed_values   = var.secrets
   key_vault_secret_names  = toset(values(var.secret_environment_overrides))
+  key_vault_seed_names    = toset(nonsensitive(keys(local.key_vault_seed_values)))
+  key_vault_existing_names = setsubtract(local.key_vault_secret_names, local.key_vault_seed_names)
   _kv_seed_requires_vault = length(local.key_vault_seed_values) > 0 && data.azurerm_key_vault.auth.id == "" ? error("key_vault_name must be set when secrets are provided") : true
   _kv_refs_requires_vault = length(local.key_vault_secret_names) > 0 && data.azurerm_key_vault.auth.id == "" ? error("key_vault_name must be set when secret_environment_overrides are configured") : true
 }
 
 resource "azurerm_key_vault_secret" "seeded" {
-  for_each = local.key_vault_seed_values
+  for_each = local.key_vault_seed_names
 
   name         = each.key
-  value        = each.value
+  value        = local.key_vault_seed_values[each.key]
   key_vault_id = data.azurerm_key_vault.auth.id
 }
 
 data "azurerm_key_vault_secret" "existing" {
-  for_each = {
-    for name in local.key_vault_secret_names : name => name
-    if !contains(keys(local.key_vault_seed_values), name)
-  }
+  for_each = local.key_vault_existing_names
 
-  name         = each.value
+  name         = each.key
   key_vault_id = data.azurerm_key_vault.auth.id
 }
 
